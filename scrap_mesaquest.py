@@ -32,9 +32,6 @@ HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 data_hoje = datetime.now().strftime("%Y%m%d")
 
-print("DIRETÓRIO ATUAL:", os.getcwd())
-print("LISTA ROOT:", os.listdir())
-
 # ------------------------------------------------------------------
 # 2. DEFINIR AS FUNÇṌES
 # ------------------------------------------------------------------
@@ -633,7 +630,7 @@ schema = {
     "preco_mes": "float64",
     "vagas_preenchidas": "int64",
     "vagas_total": "int64",
-    "lotacao_mesa": "float64",    
+    "lotacao_mesa": "float64",
     "dias_jogo_segunda": "boolean",
     "dias_jogo_terça": "boolean",
     "dias_jogo_quarta": "boolean",
@@ -646,28 +643,8 @@ schema = {
     "tags": "object"
 }
 
-# Lista todos os arquivos no padrão
-arquivos = glob.glob("raw/mesaquest/*_mesas_mesaquest.csv")
-print(arquivos)
-
-# Filtra apenas arquivos com data menor que hoje
-arquivos_validos = []
-
-for arquivo in arquivos:
-    # Extrai a parte da data (AAAAMMDD)    
-    nome_arquivo = os.path.basename(arquivo)
-    data_arquivo = nome_arquivo.split("_")[0]
-
-    if data_arquivo.isdigit() and data_arquivo < data_hoje:
-        arquivos_validos.append(arquivo)
-
-if not arquivos_validos:
-    raise FileNotFoundError("Nenhum arquivo antigo encontrado.")
-
-# Pega o mais recente entre os anteriores
-arquivo_antigo = max(arquivos_validos)
-
-print(f"Arquivo antigo selecionado: {arquivo_antigo}")
+# Arquivo antigo
+arquivo_antigo = "mesas_comissionadas.csv"
 
 # Lê o CSV encontrado
 mesas_antigo_df = pd.read_csv(
