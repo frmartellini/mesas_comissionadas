@@ -645,6 +645,7 @@ schema = {
 
 # Lista todos os arquivos no padrão
 arquivos = glob.glob("raw/mesaquest/*_mesas_mesaquest.csv")
+print(arquivos)
 
 # Filtra apenas arquivos com data menor que hoje
 arquivos_validos = []
