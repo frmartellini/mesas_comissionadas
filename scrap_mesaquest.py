@@ -354,7 +354,8 @@ def apagar_arquivos_anteriores(arquivos, data_hoje, n_dias):
     for arquivo in arquivos:
         try:
             # Extrair a data do nome do arquivo (primeiros 8 caracteres)
-            data_arquivo_str = arquivo[:8]
+            nome_arquivo = os.path.basename(arquivo)
+            data_arquivo_str = nome_arquivo.split("_")[0]
             data_arquivo = datetime.strptime(data_arquivo_str, '%Y%m%d')
 
             # Se a data do arquivo for menor ou igual à data limite, excluir o arquivo
@@ -607,12 +608,17 @@ print("DataFrame gerado com sucesso.")
 
 # Definindo o dicionário com nome_da_coluna: tipo_de_dado
 schema = {
+    "source": "object",
     "mesa_id": "object",
     "user_id": "object",
     "mesa_nome": "object",
     "mesa_tipo": "object",
     "mestre_nome": "object",
     "sistema": "object",
+    "ano": "int64",
+    "mes": "int64",
+    "dia_semana_mesa": "object",
+    "dia_semana_num": "int64",
     "duracao": "float64",
     "duracao_hhmm": "object",
     "modalidade": "object",
@@ -620,14 +626,11 @@ schema = {
     "nivel_jogadores": "object",
     "idioma": "object",
     "periodicidade": "object",
-    "softwares": "object",
-    "requisito": "object",
-    "tags": "object",
     "preco_sessao": "float64",
     "preco_mes": "float64",
-    "lotacao_mesa": "float64",
     "vagas_preenchidas": "int64",
     "vagas_total": "int64",
+    "lotacao_mesa": "float64",    
     "dias_jogo_segunda": "boolean",
     "dias_jogo_terça": "boolean",
     "dias_jogo_quarta": "boolean",
@@ -635,6 +638,9 @@ schema = {
     "dias_jogo_sexta": "boolean",
     "dias_jogo_sábado": "boolean",
     "dias_jogo_domingo": "boolean",
+    "softwares": "object",
+    "requisito": "object",
+    "tags": "object"
 }
 
 # Lista todos os arquivos no padrão
