@@ -32,6 +32,9 @@ HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 data_hoje = datetime.now().strftime("%Y%m%d")
 
+print("DIRETÓRIO ATUAL:", os.getcwd())
+print("LISTA ROOT:", os.listdir())
+
 # ------------------------------------------------------------------
 # 2. DEFINIR AS FUNÇṌES
 # ------------------------------------------------------------------
