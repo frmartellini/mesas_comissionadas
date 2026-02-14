@@ -644,8 +644,9 @@ arquivos = glob.glob("raw/mesaquest/*_mesas_mesaquest.csv")
 arquivos_validos = []
 
 for arquivo in arquivos:
-    # Extrai a parte da data (AAAAMMDD)
-    data_arquivo = arquivo.split("_")[0]
+    # Extrai a parte da data (AAAAMMDD)    
+    nome_arquivo = os.path.basename(arquivo)
+    data_arquivo = nome_arquivo.split("_")[0]
 
     if data_arquivo.isdigit() and data_arquivo < data_hoje:
         arquivos_validos.append(arquivo)
@@ -737,6 +738,20 @@ nome_arquivo = f"raw/mesaquest/{data_hoje}_mesas_mesaquest.csv"
 #### 9. Gerar o csv
 df_final.to_csv(
     nome_arquivo,
+    index=False,
+    encoding="utf-8-sig"
+)
+
+# Caminho de uma cópia na raiz do repositório
+copia_raiz = "mesas_comissionadas.csv"
+
+# Se já existir na raiz do repositório, remove antes de recriar
+if os.path.exists(copia_raiz):
+    os.remove(copia_raiz)
+
+# Cria a nova cópia na raiz do repositório
+df_final.to_csv(
+    copia_raiz,
     index=False,
     encoding="utf-8-sig"
 )
