@@ -343,28 +343,6 @@ def decimal_para_hhmm(valor):
 
     return f"{horas}:{minutos:02d}"
 
-# apagar bases de dados antigas
-def apagar_arquivos_anteriores(arquivos, data_hoje, n_dias):
-    # Converter data_hoje para o tipo datetime
-    data_atual = datetime.strptime(data_hoje, "%Y%m%d")
-
-    # Calcular a data limite (N dias atrás)
-    data_limite = data_atual - timedelta(days=n_dias)
-
-    for arquivo in arquivos:
-        try:
-            # Extrair a data do nome do arquivo (primeiros 8 caracteres)
-            nome_arquivo = os.path.basename(arquivo)
-            data_arquivo_str = nome_arquivo.split("_")[0]
-            data_arquivo = datetime.strptime(data_arquivo_str, '%Y%m%d')
-
-            # Se a data do arquivo for menor ou igual à data limite, excluir o arquivo
-            if data_arquivo <= data_limite:
-                os.remove(arquivo)
-                print(f"Arquivo {arquivo} removido.")
-        except ValueError:
-            print(f"Erro ao processar o arquivo {arquivo}. Ignorando.")
-
 # ------------------------------------------------------------------
 # 3. EXTRAIR OS DADOS DAS MESAS
 # ------------------------------------------------------------------
@@ -599,3 +577,17 @@ mesas_df = mesas_df[['source', 'mesa_id', 'user_id', 'mesa_nome', 'mesa_tipo', '
                      'requisito', 'tags']]
 
 print("DataFrame gerado com sucesso.")
+
+# ------------------------------------------------------------------
+# 6. GERAR O ARQUIVO ATUALIZADO
+# ------------------------------------------------------------------
+
+# Nome do arquivo
+nome_arquivo = f"raw/mesaquest/{data_hoje}_mesas_mesaquest.csv"
+
+#### 9. Gerar o csv
+mesas_df.to_csv(
+    nome_arquivo,
+    index=False,
+    encoding="utf-8-sig"
+)
