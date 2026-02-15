@@ -343,6 +343,28 @@ def decimal_para_hhmm(valor):
 
     return f"{horas}:{minutos:02d}"
 
+# apagar bases de dados antigas
+def apagar_arquivos_anteriores(arquivos, data_hoje, n_dias):
+    # Converter data_hoje para o tipo datetime
+    data_atual = datetime.strptime(data_hoje, "%Y%m%d")
+
+    # Calcular a data limite (N dias atrás)
+    data_limite = data_atual - timedelta(days=n_dias)
+
+    for arquivo in arquivos:
+        try:
+            # Extrair a data do nome do arquivo (primeiros 8 caracteres)
+            nome_arquivo = os.path.basename(arquivo)
+            data_arquivo_str = nome_arquivo.split("_")[0]
+            data_arquivo = datetime.strptime(data_arquivo_str, '%Y%m%d')
+
+            # Se a data do arquivo for menor ou igual à data limite, excluir o arquivo
+            if data_arquivo <= data_limite:
+                os.remove(arquivo)
+                print(f"Arquivo {arquivo} removido.")
+        except ValueError:
+            print(f"Erro ao processar o arquivo {arquivo}. Ignorando.")
+
 # ------------------------------------------------------------------
 # 3. EXTRAIR OS DADOS DAS MESAS
 # ------------------------------------------------------------------
@@ -579,6 +601,140 @@ mesas_df = mesas_df[['source', 'mesa_id', 'user_id', 'mesa_nome', 'mesa_tipo', '
 print("DataFrame gerado com sucesso.")
 
 # ------------------------------------------------------------------
+# 5. Leitura do arquivo anterior e atualização da base de dados
+# ------------------------------------------------------------------
+
+# Ler CSV antigo
+
+# Definindo o dicionário com nome_da_coluna: tipo_de_dado
+schema = {
+    "source": "object",
+    "mesa_id": "object",
+    "user_id": "object",
+    "mesa_nome": "object",
+    "mesa_tipo": "object",
+    "mestre_nome": "object",
+    "sistema": "object",
+    "ano": "int64",
+    "mes": "int64",
+    "dia_semana_mesa": "object",
+    "dia_semana_num": "int64",
+    "duracao": "float64",
+    "duracao_hhmm": "object",
+    "modalidade": "object",
+    "modalidade_tipo": "object",
+    "nivel_jogadores": "object",
+    "idioma": "object",
+    "periodicidade": "object",
+    "preco_sessao": "float64",
+    "preco_mes": "float64",
+    "vagas_preenchidas": "int64",
+    "vagas_total": "int64",
+    "lotacao_mesa": "float64",
+    "dias_jogo_segunda": "boolean",
+    "dias_jogo_terça": "boolean",
+    "dias_jogo_quarta": "boolean",
+    "dias_jogo_quinta": "boolean",
+    "dias_jogo_sexta": "boolean",
+    "dias_jogo_sábado": "boolean",
+    "dias_jogo_domingo": "boolean",
+    "softwares": "object",
+    "requisito": "object",
+    "tags": "object"
+}
+
+# Lista todos os arquivos no padrão
+arquivos = glob.glob("raw/mesaquest/*_mesas_mesaquest.csv")
+
+# Filtra apenas arquivos com data menor que hoje
+arquivos_validos = []
+
+for arquivo in arquivos:
+    # Extrai a parte da data (AAAAMMDD)
+    nome_arquivo = os.path.basename(arquivo)
+    data_arquivo = nome_arquivo.split("_")[0]
+
+    if data_arquivo.isdigit() and data_arquivo < data_hoje:
+        arquivos_validos.append(arquivo)
+
+if not arquivos_validos:
+    raise FileNotFoundError("Nenhum arquivo antigo encontrado.")
+
+# Pega o mais recente entre os anteriores
+arquivo_antigo = max(arquivos_validos)
+
+print(f"Arquivo antigo selecionado: {arquivo_antigo}")
+
+# Lê o CSV encontrado
+mesas_antigo_df = pd.read_csv(
+    arquivo_antigo,
+    dtype=schema,
+    parse_dates=["start_date", "end_date"],
+    encoding="utf-8"
+)
+
+
+# Separar mesas novas
+mesas_novas_df = mesas_df[
+    ~mesas_df["mesa_id"].isin(mesas_antigo_df["mesa_id"])
+]
+
+# Comparar mesas existentes
+df_merge = mesas_df.merge(
+    mesas_antigo_df[
+        ["mesa_id", "vagas_preenchidas", "vagas_total", "lotacao_mesa"]
+    ],
+    on="mesa_id",
+    how="inner",
+    suffixes=("_novo", "_antigo")
+)
+
+# Filtrar mesas que: NÃO estão lotadas e tiveram mudança em vagas
+df_mesas_alteradas = df_merge[
+    (df_merge["vagas_preenchidas_novo"] != df_merge["vagas_preenchidas_antigo"]) &
+    (df_merge["lotacao_mesa_antigo"] < 1)
+]
+
+# Atualizar vagas_preenchidas
+df_final = mesas_antigo_df.copy()
+
+df_final = df_final.merge(
+    df_mesas_alteradas[["mesa_id", "vagas_preenchidas_novo"]],
+    on="mesa_id",
+    how="left"
+)
+
+df_final["vagas_preenchidas"] = (
+    df_final["vagas_preenchidas_novo"]
+    .combine_first(df_final["vagas_preenchidas"])
+)
+
+df_final.drop(columns=["vagas_preenchidas_novo"], inplace=True)
+
+# Recalcular lotacao_mesa (SOMENTE se < 1)
+
+mask_recalcula = df_final["lotacao_mesa"] < 1
+
+df_final.loc[mask_recalcula, "lotacao_mesa"] = (
+    df_final.loc[mask_recalcula, "vagas_preenchidas"]
+    .div(df_final.loc[mask_recalcula, "vagas_total"])
+    .replace([np.inf, -np.inf], 0)
+    .fillna(0)
+    .round(2)
+)
+
+# Concatenar mesas novas e remover duplicados
+df_final = pd.concat(
+    [df_final, mesas_novas_df],
+    ignore_index=True
+)
+
+df_final = df_final.drop_duplicates(
+    subset="mesa_id",
+    keep="last"
+)
+
+# ------------------------------------------------------------------
 # 6. GERAR O ARQUIVO ATUALIZADO
 # ------------------------------------------------------------------
 
@@ -586,8 +742,26 @@ print("DataFrame gerado com sucesso.")
 nome_arquivo = f"raw/mesaquest/{data_hoje}_mesas_mesaquest.csv"
 
 #### 9. Gerar o csv
-mesas_df.to_csv(
+df_final.to_csv(
     nome_arquivo,
     index=False,
     encoding="utf-8-sig"
 )
+
+# Caminho de uma cópia na raiz do repositório
+copia_raiz = "mesas_comissionadas.csv"
+
+# Se já existir na raiz do repositório, remove antes de recriar
+if os.path.exists(copia_raiz):
+    os.remove(copia_raiz)
+
+# Cria a nova cópia na raiz do repositório
+df_final.to_csv(
+    copia_raiz,
+    index=False,
+    encoding="utf-8-sig"
+)
+
+# Apaga os arquivos anteriores a N dias
+n_dias = 7
+apagar_arquivos_anteriores(arquivos, data_hoje, n_dias)
