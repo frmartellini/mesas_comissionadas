@@ -365,6 +365,19 @@ def apagar_arquivos_anteriores(arquivos, data_hoje, n_dias):
         except ValueError:
             print(f"Erro ao processar o arquivo {arquivo}. Ignorando.")
 
+# Detectar outliers
+def detectar_outliers_iqr(df, coluna):
+    q1 = df[coluna].quantile(0.25)
+    q3 = df[coluna].quantile(0.75)
+    iqr = q3 - q1
+
+    limite_inf = q1 - 1.5 * iqr
+    limite_sup = q3 + 1.5 * iqr
+
+    return df[
+        (df[coluna] < limite_inf) | (df[coluna] > limite_sup)
+    ], limite_inf, limite_sup
+
 # ------------------------------------------------------------------
 # 3. EXTRAIR OS DADOS DAS MESAS
 # ------------------------------------------------------------------
@@ -496,10 +509,6 @@ mesas_df["end_date"] = pd.to_datetime(
     errors="coerce",
 )
 
-# Colunas ano e mês
-mesas_df["ano"] = mesas_df["start_date"].dt.year
-mesas_df["mes"] = mesas_df["start_date"].dt.month
-
 # Tratamento da coluna vagas
 mesas_df["vagas"] = mesas_df["vagas"].str.replace(
     " vagas preenchidas",
@@ -588,15 +597,43 @@ mesas_df["dia_semana_num"] = mesas_df["start_date"].dt.weekday  # 0=Segunda
 # Cria a coluna com a fonte dos dados
 mesas_df['source'] = 'mesaquest'
 
+# Criando faixas de ocupação das mesas
+mesas_df["faixa_lotacao_mesa"] = pd.cut(
+    mesas_df["lotacao_mesa"],
+    bins=[0, 0.25, 0.5, 0.75, 1],
+    labels=["0–25%", "25–50%", "50–75%", "75–100%"]
+    )
+
+# Criando faixas de duração
+mesas_df["faixa_duracao"] = pd.cut(
+    mesas_df["duracao"],
+    bins=[0, 2, 3, 4, 6, 12],
+    labels=["0-2h", "2–3h", "3–4h", "4–6h", "6h+"]
+)
+
+# Análise e tratamento dos outliers para as colunas de preço e duração
+# usando winsorização para preservar o volume dos dados no dataframe principal
+out_dur, li_dur, ls_dur = detectar_outliers_iqr(mesas_df, "duracao")
+mesas_df["duracao_sem_outliers"] = mesas_df["duracao"].clip(li_dur, ls_dur)
+
+out_preco_ps, li_ps, ls_ps = detectar_outliers_iqr(mesas_df, "preco_sessao")
+mesas_df["preco_sessao_sem_outliers"] = mesas_df["preco_sessao"].clip(li_ps, ls_ps)
+
+out_preco_pm, li_pm, ls_pm = detectar_outliers_iqr(mesas_df, "preco_mes")
+mesas_df["preco_mes_sem_outliers"] = mesas_df["preco_mes"].clip(li_pm, ls_pm)
+
 # Reorganização final das colunas
-mesas_df = mesas_df[['source', 'mesa_id', 'user_id', 'mesa_nome', 'mesa_tipo', 'mestre_nome',
-                     'sistema', 'ano', 'mes', 'dia_semana_mesa', 'dia_semana_num', 'start_date',
-                     'end_date', 'duracao', 'duracao_hhmm', 'modalidade', 'modalidade_tipo',
-                     'nivel_jogadores', 'idioma', 'periodicidade', 'preco_sessao', 'preco_mes',
-                     'vagas_preenchidas', 'vagas_total', 'lotacao_mesa', 'dias_jogo_segunda',
+mesas_df = mesas_df[['source', 'mesa_id', 'user_id', 'mesa_nome', 'mesa_tipo',
+                     'mestre_nome', 'sistema', 'start_date', 'end_date',
+                     'dia_semana_mesa', 'dia_semana_num', 'duracao', 'duracao_hhmm',
+                     'duracao_sem_outliers', 'faixa_duracao', 'modalidade',
+                     'modalidade_tipo', 'nivel_jogadores', 'idioma', 'periodicidade',
+                     'preco_sessao', 'preco_sessao_sem_outliers', 'preco_mes',
+                     'preco_mes_sem_outliers', 'vagas_preenchidas', 'vagas_total',
+                     'lotacao_mesa', 'faixa_lotacao_mesa', 'dias_jogo_segunda',
                      'dias_jogo_terça', 'dias_jogo_quarta', 'dias_jogo_quinta',
-                     'dias_jogo_sexta', 'dias_jogo_sábado', 'dias_jogo_domingo', 'softwares',
-                     'requisito', 'tags']]
+                     'dias_jogo_sexta', 'dias_jogo_sábado', 'dias_jogo_domingo',
+                     'softwares', 'requisito', 'tags']]
 
 print("DataFrame gerado com sucesso.")
 
@@ -615,22 +652,25 @@ schema = {
     "mesa_tipo": "object",
     "mestre_nome": "object",
     "sistema": "object",
-    "ano": "int64",
-    "mes": "int64",
     "dia_semana_mesa": "object",
     "dia_semana_num": "int64",
     "duracao": "float64",
     "duracao_hhmm": "object",
+    "duracao_sem_outliers": "float64",
+    "faixa_duracao": "category",
     "modalidade": "object",
     "modalidade_tipo": "object",
     "nivel_jogadores": "object",
     "idioma": "object",
     "periodicidade": "object",
     "preco_sessao": "float64",
+    "preco_sessao_sem_outliers": "float64",
     "preco_mes": "float64",
+    "preco_mes_sem_outliers": "float64",
     "vagas_preenchidas": "int64",
     "vagas_total": "int64",
     "lotacao_mesa": "float64",
+    "faixa_lotacao_mesa": "category",
     "dias_jogo_segunda": "boolean",
     "dias_jogo_terça": "boolean",
     "dias_jogo_quarta": "boolean",
@@ -762,6 +802,6 @@ df_final.to_csv(
     encoding="utf-8-sig"
 )
 
-# Apaga os arquivos anteriores a N dias
+# Apaga os arquivos anteriores
 n_dias = 7
 apagar_arquivos_anteriores(arquivos, data_hoje, n_dias)
