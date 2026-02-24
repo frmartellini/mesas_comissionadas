@@ -498,9 +498,12 @@ mesas_df[["vagas_preenchidas", "vagas_total"]] = mesas_df[
 
 mesas_df = mesas_df.drop(columns=["vagas"])
 
-mesas_df["vagas_preenchidas"] = mesas_df["vagas_preenchidas"].astype(
-    int
+mesas_df["vagas_preenchidas"] = (
+    pd.to_numeric(mesas_df["vagas_preenchidas"], errors="coerce")
+    .fillna(0)
+    .astype(int)
 )
+
 mesas_df["vagas_total"] = mesas_df["vagas_total"].astype(int)
 
 mesas_df["lotacao_mesa"] = (
